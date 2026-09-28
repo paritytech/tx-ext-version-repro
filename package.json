@@ -1,0 +1,33 @@
+{
+  "name": "tx-ext-version-repro",
+  "private": true,
+  "type": "module",
+  "description": "Minimal, runnable reproduction: on the current hosts, `signing.createTransaction` with `txExtVersion: 0` returns an extrinsic v4 that is one extension slot short of the People runtime's pipeline (VerifyMultiSignature), so no account-signed transaction from a product goes through. Driven by truapi-host + product-sdk, the way host-rust-core runs its own e2e scripts.",
+  "author": "Philip Poloczek <philip.poloczek@parity.io>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/paritytech/tx-ext-version-repro.git"
+  },
+  "scripts": {
+    "1:stock-signer": "scripts/run.sh scripts/1-stock-signer.ts",
+    "2:tx-ext-version": "scripts/run.sh scripts/2-tx-ext-version.ts",
+    "3:workaround": "scripts/run.sh scripts/3-workaround.ts",
+    "typecheck": "tsc --noEmit",
+    "walk": "node --import tsx scripts/walk.ts"
+  },
+  "dependencies": {
+    "@parity/product-sdk-descriptors": "0.12.0",
+    "@parity/product-sdk-host": "0.23.0",
+    "@parity/product-sdk-individuality": "0.6.0",
+    "@polkadot-api/metadata-builders": "^0.14.3",
+    "@polkadot-api/substrate-bindings": "^0.20.3",
+    "polkadot-api": "^2.2.2"
+  },
+  "devDependencies": {
+    "@parity/truapi": "^0.20.0",
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

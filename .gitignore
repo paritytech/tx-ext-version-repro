@@ -1,0 +1,7 @@
+node_modules/
+
+# truapi-host state — holds the onboarded person's SIGNING KEYS. never commit.
+.state/
+
+*.log
+.DS_Store
