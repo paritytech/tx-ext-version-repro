@@ -52,7 +52,7 @@ makes every host refuse it. So `0` is the only value with a future, and what
 
 ## The scripts
 
-| # | Script | What it does | Result on a pre-#1003 host (truapi-host 0.21.0, previewnet, 2026-09-28) |
+| # | Script | What it does | Result on a pre-#1003 host (truapi-host 0.21.0, previewnet, 2026-09-28) — for main see [Status](#status-on-host-rust-core-main-2026-09-29) |
 |---|---|---|---|
 | 1 | `1-stock-signer` | the SDK's stock signer, exactly what every product does | **fails** — v4, `VerifyMultiSignature` absent, every later slot shifted, call data one byte short; the runtime **panics** in `validate_transaction` (wasm trap) |
 | 2 | `2-tx-ext-version` with `TX_EXT_VERSION=0` | the same forwarding, value explicit | **fails** — identical bytes and verdict |
@@ -62,9 +62,104 @@ makes every host refuse it. So `0` is the only value with a future, and what
 Each run's full output is what the platform team should read: the bytes, the
 slot-by-slot walk, and the verdicts. Excerpts are in [Run it](#run-it).
 
+## Status on host-rust-core main (2026-09-29)
+
++ fix(server): read txExtVersion as the transaction extension version — **merged 2026-09-29 12:19 UTC**
+  → https://github.com/paritytech/host-rust-core/pull/1003
+
+Re-run against a `truapi-host` built from main (`33b33616c`): **the version
+bug is fixed.** `0` yields a v5 general transaction with `VerifyMultiSignature`
+filled by the host; scripts 1, 2 (`0`) and 3 pass, and the workaround's
+fix-up never fires (the first answer is already a v5). `5` is now refused
+(`NotSupported: unsupported tx_ext_version 5; the runtime declares transaction
+extension versions [0]`), as expected.
+
+| # | Script | pre-#1003 host (0.21.0) | host from main (#1003) |
+|---|---|---|---|
+| 1 | stock signer, `0` | fails, runtime panics | **sound**, v5, in block |
+| 2 | `TX_EXT_VERSION=0` | fails | **sound**, v5, in block |
+| 2 | `TX_EXT_VERSION=5` | sound (v5) | **refused**, `NotSupported` |
+| 3 | workaround | sound, two signatures | **sound**, fix-up does not fire |
+
+**Not shipped yet, and a second gap in the way.** Nothing released carries
+#1003: the 0.22.0 releases (truapi, truapi-host, ios-host, 2026-09-28 17:55 UTC)
+and the 09-28 nightlies (`ca44c7f`) predate the merge. The nightlies build
+from main on a schedule (iOS prepare 20:00 UTC, Android 22:00 UTC), so the
+09-29 builds are the first with it; the CLI needs a release after 0.22.0.
+
+But **0.22.0 and the 09-28 nightlies already carry a signing-request change the
+released SDK does not know**: the payload gained `contacts` (host-rust-core#17,
+`a2855236c`) without a wire-codec bump (still 3). product-sdk-host 0.23.0 is
+built on truapi 0.20 and sends no such field; a host on 0.22.0 or main refuses
+its request (`MalformedFrame` on the phone; in this runner the host's own
+client fails to encode it). So on the 09-28 nightlies **no product on the
+released SDK can sign at all**, version fix or not. The way through is one
+product-sdk release on truapi 0.22 and every product bumping to it:
+
++ chore(release): bump @parity/truapi to 0.22.0 — open
+  → https://github.com/paritytech/product-sdk/pull/417
+
+`CONTACTS_SHIM=1` fills `contacts: []` in this runner so the version fix can be
+measured on such a host; it is not a fix, it stands in for that SDK release.
+
+For dim2 that means: keep the workaround until the phones run a #1003 nightly
+**and** the app is on an SDK that sends `contacts`; then delete
+`lib/host/general-tx-signer.ts` and flip the desk default to `0`.
+
+### What the main host prints
+
+```text
+$ CONTACTS_SHIM=1 npm run 1:stock-signer      # truapi-host built from main at 33b33616c (2026-09-29), previewnet, SUBMIT=1
+SCRIPT 1 — the SDK's stock signer (txExtVersion 0 as the SDK sends it) — dim2.testnet on previewnet
+  CONTACTS_SHIM=1: filling the `contacts` field the released SDK does not send
+OK  bridged product-sdk onto the host
+OK  signing account: "dim2.testnet#0 = 5G9MfH8gRsVkwPdE21kViTQaSRCsdh1Dm4my52tUydeo3irK"
+OK  the host returned 140 bytes: "0x290245000101065c23c24732135c40af6ef3ce0fc5ed506743ec7a323b35017ea7aa604e590b13bc6643822ecc1977b37ac78222b79164b76402fb567e43511b4
+    extrinsic v5 general
+    format: extrinsic v5 general; extensions start at byte 4
+    the host's extension region (113 bytes) holds 98 byte(s) more than the caller's first request forwarded (15): a VerifyMultiSignature slot is present
+      UnitTransactionExtension (empty)                  undefined
+      VerifyMultiSignature     0x0101065c23c24732135c40af6ef3ce0fc5ed506743ec7a323b35017ea7aa604e590b13bc6643822ecc1977b37ac78222b79164b76402fb567e43511b4e9f27ea2b8d
+      AsPerson                 0x00                     undefined
+      AsProofOfInkParticipant  0x00                     undefined
+      ScoreAsParticipant       0x00                     undefined
+      GameAsInvited            0x00                     undefined
+      PeopleLiteAuth           0x00                     undefined
+      AsMember                 0x00                     undefined
+      AsCoinage                0x00                     undefined
+      AsResources              0x00                     undefined
+      HonourAuth               0x00                     undefined
+      AuthorizeCall            (empty)                  undefined
+      RestrictOrigins          0x00                     false
+      CheckNonZeroSender       (empty)                  undefined
+      CheckSpecVersion         (empty)                  undefined
+      CheckTxVersion           (empty)                  undefined
+      CheckGenesis             (empty)                  undefined
+      CheckMortality           0xd501                   {"type":"Mortal213","value":1}
+      CheckNonce               0x1c                     7
+      CheckWeight              (empty)                  undefined
+      ChargeAssetTxPayment     0x0000                   {"tip":"0"}
+      StorageWeightReclaim     (empty)                  undefined
+      call data: 0x00075074782d6578742d76657273696f6e2d726570726f
+OK  runtime validate_transaction: VALID
+  broadcasting…
+    ready
+OK  broadcast: in block "0xe8240c3a75b9da6fa2f6f5d41be6ed8d372df288b2f7e44a1a17d946927fb2e9"
+
+$ CONTACTS_SHIM=1 TX_EXT_VERSION=5 npm run 2:tx-ext-version
+SCRIPT 2 — txExtVersion 5 — dim2.testnet on previewnet
+[script error] Error: the host could not build the transaction (txExtVersion 5): {"tag":"Domain","value":{"tag":"V1","value":{"tag":"NotSupported","value":{"reason":"unsupported tx_ext_version 5; the runtime declares transaction extension versions [0]"}}}}
+
+$ npm run 1:stock-signer                        # same host, WITHOUT the shim: the released SDK cannot even send the request
+[script error] TypeError: undefined is not an object (evaluating 'value.length')
+    at …/node_modules/scale-ts/dist/scale-ts.mjs:342:123
+    at …/js/packages/truapi/src/generated/client.ts:1214:54 (createTransaction)
+    at signTx (…/@parity/product-sdk-host/dist/index.js:974:21)
+```
+
 ## What needs to work, and at which level
 
-**Host (host-rust-core) — this is where the fix belongs.** A product that sends
+**Host (host-rust-core) — this is where the fix belongs, and on main it is fixed (see above).** A product that sends
 `txExtVersion: 0` — the only value the SDK sends and the only one Android
 accepts — must get back a transaction the runtime decodes. PR #1003 does that:
 it reads the field as the transaction-extension version, builds a v5 general
@@ -139,6 +234,7 @@ TX_EXT_VERSION=0 npm run 2:tx-ext-version       # same thing, explicit: FAILS
 TX_EXT_VERSION=5 npm run 2:tx-ext-version       # v5: sound here, refused on Android and after #1003
 npm run 3:workaround                            # dim2's fix-up: sound, at the cost described above
 
+# CONTACTS_SHIM=1 on a host from 0.22.0 / main (its signing request wants a `contacts` field the released SDK lacks)
 # NETWORK=paseo-next-v2 for the paseo chain; SESSION=<name> picks the person
 # (a fresh name onboards one first, ~1 min, prints nothing meanwhile);
 # SUBMIT=1 also broadcasts — the dim2 account then needs funds for the fee.
