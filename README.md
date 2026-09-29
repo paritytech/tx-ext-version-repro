@@ -62,7 +62,7 @@ makes every host refuse it. So `0` is the only value with a future, and what
 Each run's full output is what the platform team should read: the bytes, the
 slot-by-slot walk, and the verdicts. Excerpts are in [Run it](#run-it).
 
-## Status (2026-09-29, 14:30 UTC): fixed and released on the host side, the SDK release is the gate
+## Status (2026-09-29, 16:10 UTC): fixed and released on both sides
 
 + fix(server): read txExtVersion as the transaction extension version — **merged 2026-09-29 12:19 UTC, released in `@parity/truapi-host` / `@parity/truapi` 0.23.0 (14:03 UTC) and the `ios-host` / `android-host` 0.23.0 line**
   → https://github.com/paritytech/host-rust-core/pull/1003
@@ -97,19 +97,22 @@ client fails to encode it). So on those hosts **no product on the released SDK
 can sign at all**, version fix or not. The way through is one product-sdk
 release on truapi 0.23 and every product bumping to it:
 
-+ chore(release): bump @parity/truapi to 0.23.0 — open (release bot; the 0.22.0 one before it failed CI on the host package's test client lacking the new `contacts` surface)
++ chore(release): bump @parity/truapi to 0.23.0 — **merged 15:20 UTC, published as `@parity/product-sdk-host` 0.24.0** (sends `contacts`, carries #415)
   → https://github.com/paritytech/product-sdk/pull/419
 
 `CONTACTS_SHIM=1` fills `contacts: []` in this runner so the version fix can be
 measured on such a host; it is not a fix, it stands in for that SDK release.
 
-For dim2 that means: keep the workaround until the phones run a 0.23.0-line
-build **and** the app is on an SDK that sends `contacts`. The removal is
-prepared and waits on that SDK release:
+For dim2 that means: the workaround goes with the bump to 0.24.0, and the
+phones move to a 0.23.0-line build in the same window (the 0.24.0 SDK speaks
+the truapi 0.23 schema, so it no longer signs on the 09-26 nightly). Verified
+on previewnet with a truapi-host built from the 0.23.0 tag: a fresh person
+bound and signed up as two v5 general transactions in consecutive blocks,
+no fix-up, no register step.
 
 + Drop the v4 signature-slot workaround and the desk's lite-key register step once product-sdk releases on truapi 0.23
   → https://github.com/paritytech/jollity-next/issues/151
-+ Use the SDK's stock signer now that truapi-host 0.23.0 builds the whole transaction — draft
++ Use the SDK's stock signer now that truapi-host 0.23.0 builds the whole transaction — ready for review
   → https://github.com/paritytech/jollity-next/pull/152
 
 ### What the main host prints
@@ -178,10 +181,9 @@ without it. That behaviour is in truapi-host 0.23.0 and the 0.23.0 phone line.
 - + Android: `createTransaction` with `txExtVersion: 5` fails with "Failed to load transaction" — the reason `5` is not a way out
   → https://github.com/paritytech/platform-bugs/issues/42
 
-**product-sdk — one release on truapi 0.23.** The stock signer's `0` is the
-correct value under #1003's semantics, and #415 (merged) makes the SDK read the
-field the same way. What products need is a published `@parity/product-sdk-host`
-built on truapi 0.23, so its signing request carries `contacts` (PR 419 above).
+**product-sdk — done: 0.24.0 on truapi 0.23.** The stock signer's `0` is the
+correct value under #1003's semantics, #415 makes the SDK read the field the
+same way, and the 0.24.0 signing request carries `contacts` (PR 419 above).
 The older issue predates that understanding, and the pin we proposed was the
 wrong shape and is closed:
 
